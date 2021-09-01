@@ -1,0 +1,31 @@
+files:
+  work_folder: c://fprocessing//work//
+  data_folder: c://fprocessing//data//
+  invalid_folder: c://fprocessing//invalid//
+  done_folder: c://fprocessing//done//
+  extension: txt
+  marker_extension: ready
+  error_postfix: error
+
+logging:
+  file:
+    name: c://fprocessing//logs//out.log
+  pattern:
+    console: "%d %-5level %logger : %msg%n"
+    file: "%d %-5level [%thread] %logger : %msg%n"
+  level:
+    root: INFO
+    com.shatcom.fprocessing: INFO
+
+db:
+  driver:
+    name: "org.h2.Driver"
+  url:  "jdbc:h2:c://fprocessing//db//testdb;MODE=MYSQL;"
+  user: "sa"
+  password: ""
+
+
+thread_pool:
+  size: 16
+  max_size: 32
+  max_queue_size: 10000

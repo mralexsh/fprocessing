@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper PUBLIC '-//mybatis.org//DTD mapper 3.0//EN'
+        'http://mybatis.org/dtd/mybatis-3-mapper.dtd'>
+<mapper namespace="com.shatcom.fprocessing.dto.WorkAddressInfo">
+
+    <resultMap id="workAddressResult" type="com.shatcom.fprocessing.dto.WorkAddressInfo">
+        <result property="firstName" column="first_name"/>
+        <result property="lastName" column="last_name"/>
+        <result property="workAddress" column="work_address"/>
+    </resultMap>
+
+    <select id="workAddressResult" resultMap="workAddressResult"
+            parameterType="com.shatcom.fprocessing.dto.ProcessingContent">
+        SELECT * FROM WORK_INFO WHERE
+        first_name=#{firstName} AND
+        last_name=#{lastName}
+        LIMIT 1;
+    </select>
+</mapper>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <bean id="mergeWorkAddress" class="com.shatcom.fprocessing.processors.MergeWorkAddress"/>
+    <bean id="calculateFileName" class="com.shatcom.fprocessing.processors.CalculateFileName"/>
+    <bean id="validatePhoneNumbers" class="com.shatcom.fprocessing.processors.ValidatePhoneNumbers"/>
+    <bean id="exceptionMessage" class="com.shatcom.fprocessing.processors.ExceptionMessage"/>
+
+    <bean id="dataSource"
+          class="org.apache.commons.dbcp2.BasicDataSource" destroy-method="close">
+        <property name="driverClassName" value="${db.driver.name}"/>
+        <property name="url" value="${db.url}"/>
+        <property name="username" value="${db.user}"/>
+        <property name="password" value="${db.password}"/>
+    </bean>
+
+
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <property name="dataSource" ref="dataSource"/>
+        <property name="mapperLocations" value="classpath*:mybatis/mappers/**/*.xml"/>
+    </bean>
+
+    <bean id="mybatis" class="org.apache.camel.component.mybatis.MyBatisComponent">
+        <property name="sqlSessionFactory" ref="sqlSessionFactory"/>
+    </bean>
+
+
+</beans>

@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd                                    http://camel.apache.org/schema/spring       http://camel.apache.org/schema/spring/camel-spring.xsd">
+
+    <import resource="spring/spring-resources.xml"/>
+
+    <camelContext id="serviceCamelContext"
+                  threadNamePattern="#camelId# ##counter#" xmlns="http://camel.apache.org/schema/spring"
+                  streamCache="true">
+
+        <threadPool id="routeThreadPool"
+                    poolSize="{{thread_pool.size}}"
+                    maxPoolSize="{{thread_pool.max_size}}"
+                    threadName="FileProcessingRouteThread"
+                    maxQueueSize="{{thread_pool.max_queue_size}}"/>
+
+        <dataFormats>
+            <json id="processingContent" library="Jackson"
+                  unmarshalTypeName="com.shatcom.fprocessing.dto.ProcessingContent"/>
+
+            <json id="workAddressInfo" library="Jackson"
+                  unmarshalTypeName="com.shatcom.fprocessing.dto.WorkAddressInfo"/>
+        </dataFormats>
+
+        <onException>
+            <exception>java.lang.Exception</exception>
+            <handled>
+                <simple>true</simple>
+            </handled>
+            <to uri="direct:errorHandlingService"/>
+        </onException>
+
+        <!--  INCOMING FILES HANDLING -->
+        <route id="fileProcessingServiceRoute">
+            <from uri="file:{{files.work_folder}}?include=.*.{{files.marker_extension}}"/>
+            <threads executorServiceRef="routeThreadPool">
+                <setHeader headerName="GrabContentFolder">
+                    <simple>{{files.work_folder}}?</simple>
+                </setHeader>
+                <to uri="direct:grabFileContent"/>
+                <to uri="json-validator:schemas/validation-schema.json"/>
+                <log loggingLevel="INFO" message="Json schema validation rules was applied."/>
+                <unmarshal ref="processingContent"/>
+                <log loggingLevel="INFO" message="Unmarshal JSON into POJO"/>
+                <process ref="validatePhoneNumbers"/>
+                <log loggingLevel="INFO" message="Phone numbers validation done."/>
+                <transform>
+                    <simple>${header.PreserveFileContent}</simple>
+                </transform>
+                <to uri="file:{{files.data_folder}}?fileName=${header.ActualFileName}"/>
+                <bean ref="calculateFileName" method="makeMarkerFileHeader"/>
+                <transform>
+                    <constant></constant>
+                </transform>
+                <to uri="file:{{files.data_folder}}?fileName=${header.MarkerFileName}"/>
+                <log loggingLevel="INFO" message="Put file into {{files.data_folder}} folder"/>
+            </threads>
+        </route>
+
+        <!--  WORK ADDRESS ENRICHMENT -->
+        <route id="workAddressEnrichmentServiceRoute">
+            <from uri="file:{{files.data_folder}}?include=.*.{{files.marker_extension}}"/>
+            <threads executorServiceRef="routeThreadPool">
+                <setHeader headerName="GrabContentFolder">
+                    <simple>{{files.data_folder}}?</simple>
+                </setHeader>
+                <log loggingLevel="INFO" message="Fetching file ${header.ActualFileName} from {{files.data_folder}} folder"/>
+                <to uri="direct:grabFileContent"/>
+                <unmarshal ref="processingContent"/>
+                <setHeader headerName="PreservePOJOContent">
+                    <simple>${body}</simple>
+                </setHeader>
+                <to uri="mybatis:workAddressResult?statementType=SelectOne"/>
+                <log loggingLevel="INFO" message="Enrich info from database"/>
+                <process ref="mergeWorkAddress"/>
+                <log loggingLevel="INFO" message="Work address merged."/>
+                <marshal ref="processingContent"/>
+                <to uri="file:{{files.done_folder}}?fileName=${header.ActualFileName}"/>
+            </threads>
+        </route>
+
+
+        <route id="grabFileContentRoute">
+            <from uri="direct:grabFileContent"/>
+            <bean ref="calculateFileName" method="makeActualFileHeader"/>
+            <pollEnrich>
+                <simple>file:${header.GrabContentFolder}?fileName=${header.ActualFileName}</simple>
+            </pollEnrich>
+            <setHeader headerName="ActualFileName">
+                <simple>${header.CamelFileNameOnly}</simple>
+            </setHeader>
+            <convertBodyTo type="String"/>
+            <setHeader headerName="PreserveFileContent">
+                <simple>${body}</simple>
+            </setHeader>
+            <log loggingLevel="INFO" message="File ${header.ActualFileName} was loaded."/>
+        </route>
+
+        <route id="errorHandlingServiceRoute">
+            <from uri="direct:errorHandlingService"/>
+            <log loggingLevel="INFO" message="-----START EXCEPTION HANDLING-----"/>
+            <log loggingLevel="ERROR" message="${property.CamelExceptionCaught}"/>
+            <transform>
+                <simple>${header.PreserveFileContent}</simple>
+            </transform>
+            <to uri="file:{{files.invalid_folder}}?fileName=${header.ActualFileName}"/>
+            <process ref="exceptionMessage"/>
+            <log loggingLevel="ERROR" message="${body}"/>
+            <to uri="file:{{files.invalid_folder}}?fileName=${header.ActualFileName}.{{files.error_postfix}}"/>
+        </route>
+
+    </camelContext>
+
+</beans>
